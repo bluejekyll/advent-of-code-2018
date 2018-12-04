@@ -1,3 +1,2 @@
-pub mod checksum;
-pub mod frequency;
-pub mod strings_differ_by_1;
+pub mod day_1;
+pub mod day_2;
