@@ -1,15 +1,25 @@
+use std::collections::HashSet;
 use std::io::{BufRead, Lines};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Frequency(isize);
 
 impl Frequency {
-    pub fn calibrate<I: IntoIterator<Item = isize>>(self, changes: I) -> Self {
-        let new = changes
-            .into_iter()
-            .fold(self.0, |current, delta| current + delta);
+    pub fn calibrate(self, deltas: &[isize]) -> Self {
+        let mut set = HashSet::new();
+        let mut freq = self.0;
 
-        Frequency(new)
+        for (iterations, delta) in deltas.iter().cycle().enumerate() {
+            assert!(iterations < 1_000_000); // making sure
+            if set.contains(&freq) {
+                return Frequency(freq);
+            }
+
+            set.insert(freq);
+            freq += delta;
+        }
+
+        panic!("for loop should only return on repeated calibration");
     }
 
     pub fn current(self) -> isize {
@@ -40,32 +50,34 @@ impl<R: BufRead> Iterator for DeltaReader<R> {
 }
 
 #[test]
-fn basic_test() {
-    let freq = Frequency::default();
-
-    assert_eq!(freq.calibrate(vec![0]).current(), 0);
-    assert_eq!(freq.calibrate(vec![-1]).current(), -1);
-    assert_eq!(freq.calibrate(vec![1]).current(), 1);
+fn test_calibrate() {
+    assert_eq!(Frequency::default().calibrate(&[1, -1]).current(), 0);
+    assert_eq!(
+        Frequency::default().calibrate(&[3, 3, 4, -2, -4]).current(),
+        10
+    );
+    assert_eq!(
+        Frequency::default().calibrate(&[-6, 3, 8, 5, -6]).current(),
+        5
+    );
+    assert_eq!(
+        Frequency::default()
+            .calibrate(&[7, 7, -2, -7, -4])
+            .current(),
+        14
+    );
 }
 
 #[test]
-fn parse_int() {
-    use std::str::FromStr;
-
-    assert_eq!(isize::from_str("-1").unwrap(), -1);
-    assert_eq!(isize::from_str("+1").unwrap(), 1);
-}
-
-#[test]
-fn test_day_1_input() {
+fn test_day_1_part_2() {
     use std::fs::File;
     use std::io::BufReader;
 
     let file = File::open("tests/test-data/day-1-input.txt").expect("could not open file");
-    let reader = DeltaReader::from(BufReader::with_capacity(8, file));
+    let reader = DeltaReader::from(BufReader::new(file));
+    let deltas = reader.collect::<Vec<_>>();
 
-    let frequency = Frequency::default();
-    let frequency = frequency.calibrate(reader);
+    let frequency = Frequency::default().calibrate(&deltas);
 
     println!("calibrated frequency is: {}", frequency.current());
 }
